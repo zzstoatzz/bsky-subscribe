@@ -1,4 +1,4 @@
-# copy of sub_to_did.py, but
+"""subscribe to some handles, and text me when a new post is made by one of them"""
 
 import argparse
 import asyncio
