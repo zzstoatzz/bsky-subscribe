@@ -1,0 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# uv never pip (search for how to use uv)
+
+# omit stupid fluff comments

@@ -6,8 +6,4 @@ WORKDIR /app
 COPY . .
 RUN uv sync
 
-CMD ["uv", "run", "sub_to_handle.py", \
-    "--handle", "bsky.social", \
-    "--handle", "segyges.bsky.social", \
-    "--handle", "jay.bsky.team", \
-    "--handle", "pfrazee.com"] 
+ENTRYPOINT ["uv", "run", "sub_to_handle.py", "--handle", "bsky.social", "--handle", "segyges.bsky.social", "--handle", "jay.bsky.team", "--handle", "pfrazee.com"] 

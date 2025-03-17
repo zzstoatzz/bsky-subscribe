@@ -1,16 +1,11 @@
-"""subscribe to some handles, and text me when a new post is made by one of them"""
+"""subscribe to some handles, and DM me when a new post is made by one of them"""
 
 import argparse
 import asyncio
 import logging
 from bsky_subscribe.monitor import monitor_user_posts
-from atproto import models
-
-
-from typing import Annotated
-
-import httpx
-from pydantic import BeforeValidator, Field
+from atproto import models, Client, IdResolver, client_utils
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logging.basicConfig(
@@ -19,54 +14,95 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class SurgeSettings(BaseSettings):
+class BlueskySettings(BaseSettings):
     model_config: SettingsConfigDict = SettingsConfigDict(
-        env_prefix="SURGE_", extra="ignore", env_file=".env"
+        env_prefix="BLUESKY_", extra="ignore", env_file=".env"
     )
 
-    api_key: str = Field(default=...)
-    account_id: str = Field(default=...)
-    my_phone_number: Annotated[
-        str, BeforeValidator(lambda v: "+" + v if not v.startswith("+") else v)
-    ] = Field(default=...)
-    my_first_name: str = Field(default=...)
-    my_last_name: str = Field(default=...)
+    handle: str = Field(default=...)
+    password: str = Field(default=...)
+    recipient_did: str = Field(default=...)
 
 
-surge_settings = SurgeSettings()
+bluesky_settings = BlueskySettings()
+bluesky_client = None
+id_resolver = IdResolver()
 
 
-def text_me(text_content: str) -> str:
-    """Send a text message to the user that you operate on behalf of."""
-    with httpx.Client() as client:
-        response = client.post(
-            "https://api.surgemsg.com/messages",
-            headers={
-                "Authorization": f"Bearer {surge_settings.api_key}",
-                "Surge-Account": surge_settings.account_id,
-                "Content-Type": "application/json",
-            },
-            json={
-                "body": text_content,
-                "conversation": {
-                    "contact": {
-                        "first_name": surge_settings.my_first_name,
-                        "last_name": surge_settings.my_last_name,
-                        "phone_number": surge_settings.my_phone_number,
-                    }
-                },
-            },
+def init_bluesky_client():
+    global bluesky_client
+    if bluesky_client is None:
+        client = Client()
+        client.login(bluesky_settings.handle, bluesky_settings.password)
+        bluesky_client = client.with_bsky_chat_proxy()
+    return bluesky_client
+
+
+def dm_me(text_content: str, link_url: str | None = None) -> str:
+    """Send a direct message to the user on Bluesky."""
+    client = init_bluesky_client()
+    dm = client.chat.bsky.convo
+
+    convo = dm.get_convo_for_members(
+        models.ChatBskyConvoGetConvoForMembers.Params(
+            members=[bluesky_settings.recipient_did]
+        ),
+    ).convo
+
+    # Create message with proper link if URL is provided
+    if link_url:
+        # Use TextBuilder to create rich text with a link
+        text_builder = client_utils.TextBuilder()
+        text_builder.text(text_content)
+        text_builder.text("\n\n")
+        text_builder.link("View post", link_url)
+
+        # Send message with rich text
+        dm.send_message(
+            models.ChatBskyConvoSendMessage.Data(
+                convo_id=convo.id,
+                message=models.ChatBskyConvoDefs.MessageInput(
+                    text=text_builder.build_text(),
+                    facets=text_builder.build_facets(),
+                ),
+            )
         )
-        response.raise_for_status()
-        return f"Message sent: {text_content}"
+    else:
+        # Send regular text message
+        dm.send_message(
+            models.ChatBskyConvoSendMessage.Data(
+                convo_id=convo.id,
+                message=models.ChatBskyConvoDefs.MessageInput(
+                    text=text_content,
+                ),
+            )
+        )
+
+    return f"Message sent: {text_content}"
+
+
+def get_handle_from_did(did: str) -> str:
+    """Get the handle for a DID."""
+    try:
+        client = Client()
+        client.login(bluesky_settings.handle, bluesky_settings.password)
+        profile = client.app.bsky.actor.get_profile({"actor": did})
+        return profile.handle
+    except Exception as e:
+        logger.error(f"Error getting handle for DID {did}: {e}")
+        return did  # Return the DID if resolution fails
 
 
 def notify_new_post(commit: models.ComAtprotoSyncSubscribeRepos.Commit):
     rkey = commit.ops[0].path.split("/")[-1]
     post_url = f"https://bsky.app/profile/{commit.repo}/post/{rkey}"
-    message = f"New post from {commit.repo!r}, link: {post_url}"
-    print(message)
-    text_me(message)
+
+    # Try to get the handle from the DID
+    handle = get_handle_from_did(commit.repo)
+
+    message = f"🔔 New post from @{handle}"
+    print(f"{message}\n{post_url}")
+    dm_me(message, post_url)
 
 
 async def main():
