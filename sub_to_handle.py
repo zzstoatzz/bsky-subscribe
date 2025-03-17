@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import logging
 from bsky_subscribe.monitor import monitor_user_posts
 from atproto import models
 
@@ -11,6 +12,11 @@ from typing import Annotated
 import httpx
 from pydantic import BeforeValidator, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 
 class SurgeSettings(BaseSettings):
@@ -73,7 +79,15 @@ async def main():
         help="Handles to monitor (can be specified multiple times)",
     )
     args = parser.parse_args()
-    await monitor_user_posts(set(args.handle), notify_new_post)
+
+    while True:
+        try:
+            logger.info(f"Starting monitor for handles: {args.handle}")
+            await monitor_user_posts(set(args.handle), notify_new_post)
+        except Exception as e:
+            logger.error(f"Error in monitor: {e}")
+            logger.info("Reconnecting in 10 seconds...")
+            await asyncio.sleep(10)
 
 
 if __name__ == "__main__":
