@@ -1,3 +1,5 @@
+# copy of sub_to_did.py, but
+
 import argparse
 import asyncio
 from bsky_subscribe.monitor import monitor_user_posts
@@ -64,14 +66,14 @@ def notify_new_post(commit: models.ComAtprotoSyncSubscribeRepos.Commit):
 async def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--did",
+        "--handle",
         type=str,
         action="append",
         required=True,
-        help="DIDs to monitor (can be specified multiple times)",
+        help="Handles to monitor (can be specified multiple times)",
     )
     args = parser.parse_args()
-    await monitor_user_posts(set(args.did), notify_new_post)
+    await monitor_user_posts(set(args.handle), notify_new_post)
 
 
 if __name__ == "__main__":
