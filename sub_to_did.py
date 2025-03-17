@@ -56,14 +56,22 @@ def text_me(text_content: str) -> str:
 def notify_new_post(commit: models.ComAtprotoSyncSubscribeRepos.Commit):
     rkey = commit.ops[0].path.split("/")[-1]
     post_url = f"https://bsky.app/profile/{commit.repo}/post/{rkey}"
-    text_me(f"New post from {commit.repo}: {post_url}")
+    message = f"New post from {commit.repo!r}, link: {post_url}"
+    print(message)
+    text_me(message)
 
 
 async def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--did", type=str, required=True)
+    parser.add_argument(
+        "--did",
+        type=str,
+        action="append",
+        required=True,
+        help="DIDs to monitor (can be specified multiple times)",
+    )
     args = parser.parse_args()
-    await monitor_user_posts(args.did, notify_new_post)
+    await monitor_user_posts(set(args.did), notify_new_post)
 
 
 if __name__ == "__main__":

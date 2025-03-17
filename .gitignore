@@ -9,5 +9,9 @@ wheels/
 # Virtual environments
 .venv
 
-
+# secrets
 .env
+
+# other artifacts
+*.pid
+monitor.log

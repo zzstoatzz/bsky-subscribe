@@ -1,4 +1,4 @@
-"""Monitor posts from a specific Bluesky user."""
+"""Monitor posts from specific Bluesky users."""
 
 import logging
 from typing import Callable
@@ -15,16 +15,17 @@ logger = logging.getLogger(__name__)
 
 
 async def monitor_user_posts(
-    did: Did, callback: Callable[[models.ComAtprotoSyncSubscribeRepos.Commit], None]
+    dids: set[Did],
+    callback: Callable[[models.ComAtprotoSyncSubscribeRepos.Commit], None],
 ) -> None:
-    """Monitor posts from a specific Bluesky user."""
+    """Monitor posts from specific Bluesky users."""
     client = AsyncFirehoseSubscribeReposClient()
-    logger.info(f"Monitoring posts from {did}")
+    logger.info(f"Monitoring posts from: {', '.join(dids)}")
 
     async def on_message_handler(message: firehose_models.MessageFrame) -> None:
         commit = parse_subscribe_repos_message(message)
         if isinstance(commit, models.ComAtprotoSyncSubscribeRepos.Commit):
-            if commit.repo == did:
+            if commit.repo in dids:
                 for op in commit.ops:
                     if op.action == "create" and op.path.startswith(
                         "app.bsky.feed.post"
