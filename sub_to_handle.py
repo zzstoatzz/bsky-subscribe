@@ -49,15 +49,12 @@ def dm_me(text_content: str, link_url: str | None = None) -> str:
         ),
     ).convo
 
-    # Create message with proper link if URL is provided
     if link_url:
-        # Use TextBuilder to create rich text with a link
         text_builder = client_utils.TextBuilder()
         text_builder.text(text_content)
         text_builder.text("\n\n")
         text_builder.link("View post", link_url)
 
-        # Send message with rich text
         dm.send_message(
             models.ChatBskyConvoSendMessage.Data(
                 convo_id=convo.id,
@@ -68,7 +65,6 @@ def dm_me(text_content: str, link_url: str | None = None) -> str:
             )
         )
     else:
-        # Send regular text message
         dm.send_message(
             models.ChatBskyConvoSendMessage.Data(
                 convo_id=convo.id,
@@ -97,10 +93,7 @@ def notify_new_post(commit: models.ComAtprotoSyncSubscribeRepos.Commit):
     rkey = commit.ops[0].path.split("/")[-1]
     post_url = f"https://bsky.app/profile/{commit.repo}/post/{rkey}"
 
-    # Try to get the handle from the DID
-    handle = get_handle_from_did(commit.repo)
-
-    message = f"🔔 New post from @{handle}"
+    message = f"🔔 New post from @{get_handle_from_did(commit.repo)}"
     print(f"{message}\n{post_url}")
     dm_me(message, post_url)
 
